@@ -12,13 +12,12 @@
  *
  */
 metadata {
-	definition (name: "My GE Z-wave Switch", namespace: "matthewburton71", author: "Matthew Burton") {
-		capability "Actuator"
-		capability "Indicator"
+	definition (name: "My GE outdoor Z-Wave Switch", namespace: "matthewburton71", author: "Matthew Burton") {
+		capability "Actuator"		// device has commands
+		capability "Sensor"			// device has attrubutes
 		capability "Switch"
 		capability "Polling"
 		capability "Refresh"
-		capability "Sensor"
 
 		fingerprint inClusters: "0x25"
 	}
@@ -42,24 +41,20 @@ metadata {
 			}
 		}
 
-		standardTile("indicator", "device.indicatorStatus", width: 2, height: 2, inactiveLabel: false, decoration: "flat") {
-			state "when off", action:"indicator.indicatorWhenOn", icon:"st.indicators.lit-when-off"
-			state "when on", action:"indicator.indicatorNever", icon:"st.indicators.lit-when-on"
-			state "never", action:"indicator.indicatorWhenOff", icon:"st.indicators.never-lit"
-		}
 		standardTile("refresh", "device.switch", width: 2, height: 2, inactiveLabel: false, decoration: "flat") {
 			state "default", label:'', action:"refresh.refresh", icon:"st.secondary.refresh"
 		}
 
 		main "switch"
-		details(["switch","refresh","indicator"])
+		details(["switch","refresh"])
 	}
 }
 
 def parse(String description) {
-	log.debug("Parse: " + description);
+	log.debug("parse, description: " + description);
 	def result = null
 	def cmd = zwave.parse(description, [0x20: 1, 0x70: 1])
+    log.debug("--cmd: " + cmd);
 	if (cmd) {
 		result = createEvent(zwaveEvent(cmd))
 	}
@@ -73,6 +68,7 @@ def parse(String description) {
 }
 
 def zwaveEvent(physicalgraph.zwave.commands.basicv1.BasicReport cmd) {
+	log.debug("BasicReport");
 	[name: "switch", value: cmd.value ? "on" : "off", type: "physical"]
 }
 
@@ -81,6 +77,7 @@ def zwaveEvent(physicalgraph.zwave.commands.basicv1.BasicSet cmd) {
 }
 
 def zwaveEvent(physicalgraph.zwave.commands.switchbinaryv1.SwitchBinaryReport cmd) {
+	log.debug("SwitchBinaryReport");
 	[name: "switch", value: cmd.value ? "on" : "off", type: "digital"]
 }
 
@@ -107,7 +104,7 @@ def zwaveEvent(physicalgraph.zwave.Command cmd) {
 }
 
 def on() {
-	log.debug("ON");
+	log.debug("on()");
 	delayBetween([
 		zwave.basicV1.basicSet(value: 0xFF).format(),
 		zwave.switchBinaryV1.switchBinaryGet().format()
@@ -115,7 +112,7 @@ def on() {
 }
 
 def off() {
-	log.debug("OFF");
+	log.debug("off()");
 	delayBetween([
 		zwave.basicV1.basicSet(value: 0x00).format(),
 		zwave.switchBinaryV1.switchBinaryGet().format()
@@ -123,6 +120,7 @@ def off() {
 }
 
 def poll() {
+	log.debug("poll()");
 	delayBetween([
 		zwave.switchBinaryV1.switchBinaryGet().format(),
 		zwave.manufacturerSpecificV1.manufacturerSpecificGet().format()
@@ -130,26 +128,11 @@ def poll() {
 }
 
 def refresh() {
-	log.debug("refresh");
+	log.debug("refreash()");
 	delayBetween([
 		zwave.switchBinaryV1.switchBinaryGet().format(),
 		zwave.manufacturerSpecificV1.manufacturerSpecificGet().format()
 	])
-}
-
-def indicatorWhenOn() {
-	sendEvent(name: "indicatorStatus", value: "when on", display: false)
-	zwave.configurationV1.configurationSet(configurationValue: [1], parameterNumber: 3, size: 1).format()
-}
-
-def indicatorWhenOff() {
-	sendEvent(name: "indicatorStatus", value: "when off", display: false)
-	zwave.configurationV1.configurationSet(configurationValue: [0], parameterNumber: 3, size: 1).format()
-}
-
-def indicatorNever() {
-	sendEvent(name: "indicatorStatus", value: "never", display: false)
-	zwave.configurationV1.configurationSet(configurationValue: [2], parameterNumber: 3, size: 1).format()
 }
 
 def invertSwitch(invert=true) {
