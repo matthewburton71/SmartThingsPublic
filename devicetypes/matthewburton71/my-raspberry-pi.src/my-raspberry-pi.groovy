@@ -67,7 +67,7 @@ metadata {
                 [value: 80, color: "#44b621"], // green
                 [value: 120, color: "#f1d801"], // yellow
                 [value: 140, color: "#d04e00"], // orange
-                [value: 158, color: "#bc2323"] // red
+                [value: 158, color: "#bc2323"]  // red
                 
                 //[value: 25, color: "#153591"],
                 //[value: 35, color: "#1e9cbb"],
@@ -137,10 +137,11 @@ metadata {
 
 // parse events into attributes
 def parse(String description) {
-	log.debug("parse description: " + description);
+	log.debug("parse");
+	//log.debug("parse description: " + description);
     def map = [:]
     def descMap = parseDescriptionAsMap(description)
-    log.debug "descMap: ${descMap}"
+    //log.debug "descMap: ${descMap}"
     
     def body = new String(descMap["body"].decodeBase64())
     log.debug "body: ${body}"
@@ -157,7 +158,7 @@ def parse(String description) {
     
     log.debug "check temp..."
     if (result.containsKey("cpu_temp")) {
-    	log.debug "temp: ${result.cpu_temp.toDouble().round()}"
+    	log.debug "temp: ${result.cpu_temp.toDouble().round()} C"
         log.debug "temp: ${celsiusToFahrenheit(result.cpu_temp.toDouble().round())} F"
     	sendEvent(name: "temperature", value: celsiusToFahrenheit(result.cpu_temp.toDouble().round()))
     }
@@ -176,16 +177,19 @@ def parse(String description) {
         sendEvent(name: "diskUsage", value: result.disk_usage.toDouble().round())
     }
   	if (result.containsKey("gpio_value_17")) {
-    	log.debug "gpio_value_17: ${result.gpio_value_17.toDouble().round()}"
-        if (result.gpio_value_17.contains("0")){
-        	log.debug "gpio_value_17: open"
-            sendEvent(name: "contact", value: "open")
+    if(result.gpio_value_17 == "not_exported") {
+      log.debug "gpio_value_17: ${result.gpio_value_17}"
         } else {
-        	log.debug "gpio_value_17: closed"
-            sendEvent(name: "contact", value: "closed")
+    	  log.debug "gpio_value_17: ${result.gpio_value_17.toDouble().round()}"
+            if (result.gpio_value_17.contains("0")){
+        	  log.debug "gpio_value_17: open"
+              sendEvent(name: "contact", value: "open")
+            } else {
+        	  log.debug "gpio_value_17: closed"
+              sendEvent(name: "contact", value: "closed")
+            }
         }
     }
-  	
 }
 
 // handle commands
@@ -205,18 +209,39 @@ def restart(){
 	log.debug "Restart was pressed"
     sendEvent(name: "switch", value: "off")
     def uri = "/api_command/reboot"
-    postAction(uri)
+    getAction(uri)
 }
 
 // Get CPU percentage reading
 private getRPiData() {
 	def uri = "/api_command/smartthings"
-    postAction(uri)
+    getAction(uri)
 }
 
 // ------------------------------------------------------------------
 
+private getAction(uri){
+log.debug("Sent GET");
+  setDeviceNetworkId(ip,port)  
+  
+  def userpass = encodeCredentials(username, password)
+  //log.debug("userpass: " + userpass) 
+  
+  def headers = getHeader(userpass)
+  //log.debug("headders: " + headers) 
+  
+  def hubAction = new physicalgraph.device.HubAction(
+    method: "GET",
+    path: uri,
+    headers: headers
+  )//,delayAction(1000), refresh()]
+  log.debug("Executing hubAction on " + getHostAddress())
+  log.debug hubAction
+  return hubAction;
+}
+
 private postAction(uri){
+  log.debug("Sent POST");
   setDeviceNetworkId(ip,port)  
   
   def userpass = encodeCredentials(username, password)
@@ -231,10 +256,9 @@ private postAction(uri){
     headers: headers
   )//,delayAction(1000), refresh()]
   log.debug("Executing hubAction on " + getHostAddress())
-  //log.debug hubAction
-  hubAction    
+  log.debug hubAction
+  return hubAction;
 }
-
 // ------------------------------------------------------------------
 // Helper methods
 // ------------------------------------------------------------------
